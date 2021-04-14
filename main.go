@@ -158,13 +158,16 @@ func main() {
 		db.SetConnMaxLifetime(time.Second * 60)
 		db.SetMaxOpenConns(1)
 
-		rows, err := db.Query(`SELECT c.ID, c.CERTIFICATE FROM certificate c WHERE 
-				coalesce(x509_notAfter(c.CERTIFICATE), 'infinity'::timestamp) >= date_trunc('year', now() AT TIME ZONE 'UTC')
-				AND x509_notAfter(c.CERTIFICATE) >= now() AT TIME ZONE 'UTC'
-				AND (SELECT x509_nameAttributes(c.CERTIFICATE, 'stateOrProvinceName', TRUE) LIMIT 1) IS NOT NULL
-				AND c.ID > $1
-			ORDER BY c.ID
-			LIMIT $2`, crtsh_id, SELECT_LIMIT)
+		rows, err := db.Query(`
+SELECT c.ID, c.CERTIFICATE
+	FROM certificate c
+	WHERE coalesce(x509_notAfter(c.CERTIFICATE), 'infinity'::timestamp) >= date_trunc('year', now() AT TIME ZONE 'UTC')
+		AND x509_notAfter(c.CERTIFICATE) >= now() AT TIME ZONE 'UTC'
+		AND (SELECT x509_nameAttributes(c.CERTIFICATE, 'stateOrProvinceName', TRUE) LIMIT 1) IS NOT NULL
+		AND c.ID > $1
+	ORDER BY c.ID
+	LIMIT $2
+`, crtsh_id, SELECT_LIMIT)
 		if err != nil {
 			log.Println("in query:", err)
 			time.Sleep(1 * time.Minute)
