@@ -158,7 +158,7 @@ func main() {
 		db.SetConnMaxLifetime(time.Second * 60)
 		db.SetMaxOpenConns(1)
 
-		rows, err := db.Query(`SELECT c.ID, c.CERTIFICATE FROM certificate c WHERE 
+		rows, err := db.Query(`SELECT c.ID, c.CERTIFICATE, digest(x509_tbscert_strip_ct_ext(c.CERTIFICATE), 'sha256') CT_TBS FROM certificate c WHERE 
 				coalesce(x509_notAfter(c.CERTIFICATE), 'infinity'::timestamp) >= date_trunc('year', now() AT TIME ZONE 'UTC')
 				AND x509_notAfter(c.CERTIFICATE) >= now() AT TIME ZONE 'UTC'
 				AND (SELECT x509_nameAttributes(c.CERTIFICATE, 'stateOrProvinceName', TRUE) LIMIT 1) IS NOT NULL
@@ -177,7 +177,8 @@ func main() {
 		for rows.Next() {
 			i++
 			var der []byte
-			if err := rows.Scan(&crtsh_id, &der); err != nil {
+			var ct_tbs []byte
+			if err := rows.Scan(&crtsh_id, &der, &ct_tbs); err != nil {
 				log.Println(err)
 				continue
 			}
