@@ -30,7 +30,7 @@ type service struct {
 	worker  chan []byte
 }
 
-const SELECT_LIMIT int = 1000
+const SELECT_LIMIT int = 100
 
 func (s *service) doWork() {
 	for {
@@ -165,6 +165,16 @@ SELECT c.ID, c.CERTIFICATE
 		AND x509_notAfter(c.CERTIFICATE) >= now() AT TIME ZONE 'UTC'
 		AND (SELECT x509_nameAttributes(c.CERTIFICATE, 'stateOrProvinceName', TRUE) LIMIT 1) IS NOT NULL
 		AND c.ID > $1
+		AND NOT EXISTS (
+			SELECT 1
+				FROM certificate c2
+				WHERE coalesce(x509_notAfter(c2.CERTIFICATE), 'infinity'::timestamp) >= date_trunc('year', now() AT TIME ZONE 'UTC')
+					AND x509_serialNumber(c2.CERTIFICATE) = x509_serialNumber(c.CERTIFICATE)
+					AND c2.ISSUER_CA_ID = c.ISSUER_CA_ID
+					AND c2.ID < c.ID
+					AND x509_tbscert_strip_ct_ext(c2.CERTIFICATE) = x509_tbscert_strip_ct_ext(c.CERTIFICATE)
+				LIMIT 1
+		)
 	ORDER BY c.ID
 	LIMIT $2
 `, crtsh_id, SELECT_LIMIT)
